@@ -8,6 +8,9 @@
       const response = await fetch('http://localhost:3000/');
       const data = await response.text();
       backendStatus = `백엔드 연결 성공: ${data}`;
+    /**
+    * @param {any[]} error
+    */
     } catch (error) {
       backendStatus = `백엔드 연결 실패: ${error.message}`;
     }
