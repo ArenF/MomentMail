@@ -1,0 +1,33 @@
+{
+    "name": "Letter Messenger Dev Environment",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {
+        "version": "lts"
+      },
+      "ghcr.io/devcontainers/features/git:1": {},
+      "ghcr.io/devcontainers-contrib/features/redis-server:1": {}
+    },
+    "forwardPorts": [5173, 3000, 6379, 27017],
+    "postCreateCommand": "npm install -g pnpm@latest",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "svelte.svelte-vscode",
+          "dbaeumer.vscode-eslint",
+          "esbenp.prettier-vscode",
+          "bradlc.vscode-tailwindcss",
+          "eamodio.gitlens",
+          "ritwickdey.liveserver",
+          "mongodb.mongodb-vscode"
+        ],
+        "settings": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "[svelte]": {
+            "editor.defaultFormatter": "svelte.svelte-vscode"
+          }
+        }
+      }
+    }
+  }
