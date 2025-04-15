@@ -1,4 +1,5 @@
 version: '3'
+
 services:
   app:
     build: 
@@ -7,15 +8,44 @@ services:
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
-    network_mode: service:mongodb
+    # MongoDB 및 Redis에 접근할 수 있도록 네트워크 설정
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - momentmail-network
 
   mongodb:
     image: mongo:latest
     restart: unless-stopped
+    environment:
+      # MongoDB 인증 정보 설정 (개발 환경용)
+      MONGO_INITDB_ROOT_USERNAME: momuser
+      MONGO_INITDB_ROOT_PASSWORD: mompwd
+      MONGO_INITDB_DATABASE: momentmail
     volumes:
       - mongodb-data:/data/db
+      # 초기화 스크립트로 데이터베이스 사용자 및 컬렉션 설정
+      - ./mongodb-init:/docker-entrypoint-initdb.d
     ports:
       - 27017:27017
+    networks:
+      - momentmail-network
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data
+    networks:
+      - momentmail-network
 
 volumes:
   mongodb-data:
+  redis-data:
+
+networks:
+  momentmail-network:
+    driver: bridge
