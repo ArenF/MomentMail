@@ -1,11 +1,33 @@
+
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { register } from '$lib/utils/auth';
+  import { authStore } from '$lib/stores/authStore';
+
   let email = '';
   let password = '';
   let confirmPassword = '';
   let nickname = '';
   let error = '';
+  let loading = false;
+  let successMessage = '';
+  
+  onMount(() => {
+    // 이미 로그인되어 있으면 메인 페이지로 리디렉션
+    const unsubscribe = authStore.subscribe(state => {
+      if (state.isAuthenticated) {
+        goto('/');
+      }
+    });
+    
+    return unsubscribe;
+  });
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    error = '';
+    successMessage = '';
+    
     // 기본적인 유효성 검사
     if (!email || !password || !confirmPassword || !nickname) {
       error = '모든 필드를 입력해주세요.';
@@ -16,12 +38,38 @@
       error = '비밀번호가 일치하지 않습니다.';
       return;
     }
-
-    // 여기에 회원가입 처리 로직 구현
-    console.log('회원가입 시도:', { email, password, nickname });
-    // 실제 회원가입 로직은 추후 구현
-
     
+    if (password.length < 6) {
+      error = '비밀번호는 최소 6자 이상이어야 합니다.';
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      error = '유효한 이메일 주소를 입력해주세요.';
+      return;
+    }
+
+    // 회원가입 API 호출
+    loading = true;
+    try {
+      const result = await register(email, password, nickname);
+      
+      if (result.success) {
+        successMessage = result.message;
+        // 3초 후 로그인 페이지로 이동
+        setTimeout(() => {
+          goto('/login');
+        }, 3000);
+      } else {
+        error = result.message;
+      }
+    } catch (err) {
+      error = '회원가입 중 오류가 발생했습니다. 나중에 다시 시도해주세요.';
+      console.error('회원가입 오류:', err);
+    } finally {
+      loading = false;
+    }
   }
 </script>
 
@@ -38,6 +86,10 @@
         <div class="error-message">{error}</div>
       {/if}
       
+      {#if successMessage}
+        <div class="success-message">{successMessage}</div>
+      {/if}
+      
       <div class="form-group">
         <label for="email">이메일</label>
         <input
@@ -46,6 +98,7 @@
           bind:value={email}
           placeholder="example@mail.com"
           required
+          disabled={loading}
         />
       </div>
       
@@ -57,6 +110,7 @@
           bind:value={nickname}
           placeholder="사용할 닉네임"
           required
+          disabled={loading}
         />
       </div>
       
@@ -68,6 +122,7 @@
           bind:value={password}
           placeholder="비밀번호를 입력하세요"
           required
+          disabled={loading}
         />
       </div>
       
@@ -79,10 +134,13 @@
           bind:value={confirmPassword}
           placeholder="비밀번호를 다시 입력하세요"
           required
+          disabled={loading}
         />
       </div>
       
-      <button type="submit" class="submit-button">회원가입</button>
+      <button type="submit" class="submit-button" disabled={loading}>
+        {loading ? '처리 중...' : '회원가입'}
+      </button>
       
       <div class="auth-links">
         <a href="/login">이미 계정이 있으신가요? 로그인</a>
@@ -90,7 +148,7 @@
       
       <div class="social-login">
         <p>또는</p>
-        <button type="button" class="google-button">
+        <button type="button" class="google-button" disabled={loading}>
           Google로 회원가입
         </button>
       </div>
@@ -133,11 +191,20 @@
   
   .error-message {
     background-color: #fff5f5;
-    color: var(--error-color);
+    color: var(--error-color, #e53e3e);
     padding: 0.75rem;
     border-radius: 4px;
     margin-bottom: 1rem;
     border: 1px solid #fee;
+  }
+  
+  .success-message {
+    background-color: #f0fff4;
+    color: var(--success-color, #38a169);
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    border: 1px solid #c6f6d5;
   }
   
   .submit-button {
@@ -145,6 +212,20 @@
     padding: 0.75rem;
     margin-top: 0.5rem;
     font-size: 1rem;
+    background-color: var(--primary-color, #4299e1);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .submit-button:hover:not([disabled]) {
+    background-color: var(--primary-dark, #3182ce);
+  }
+  
+  .submit-button:disabled {
+    background-color: var(--medium-gray, #cbd5e0);
+    cursor: not-allowed;
   }
   
   .auth-links {
@@ -155,13 +236,13 @@
   }
   
   .auth-links a {
-    color: var(--dark-gray);
+    color: var(--dark-gray, #4a5568);
     font-size: 0.9rem;
     text-align: center;
   }
   
   .auth-links a:hover {
-    color: var(--primary-color);
+    color: var(--primary-color, #4299e1);
   }
   
   .social-login {
@@ -170,7 +251,7 @@
   }
   
   .social-login p {
-    color: var(--dark-gray);
+    color: var(--dark-gray, #4a5568);
     margin-bottom: 1rem;
     position: relative;
   }
@@ -181,7 +262,7 @@
     position: absolute;
     width: 40%;
     height: 1px;
-    background-color: var(--medium-gray);
+    background-color: var(--medium-gray, #cbd5e0);
     top: 50%;
   }
   
@@ -195,12 +276,20 @@
   
   .google-button {
     background-color: white;
-    color: var(--text-color);
-    border: 1px solid var(--medium-gray);
+    color: var(--text-color, #1a202c);
+    border: 1px solid var(--medium-gray, #cbd5e0);
     width: 100%;
+    padding: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
   }
   
-  .google-button:hover {
-    background-color: var(--light-gray);
+  .google-button:hover:not([disabled]) {
+    background-color: var(--light-gray, #f7fafc);
+  }
+  
+  .google-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 </style>

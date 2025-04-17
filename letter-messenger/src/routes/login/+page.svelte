@@ -1,17 +1,62 @@
+
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { login } from '$lib/utils/auth';
+  import { authStore } from '$lib/stores/authStore';
+
   let email = '';
   let password = '';
   let error = '';
+  let loading = false;
+  let redirectTo = '/';
 
-  function handleSubmit() {
-    // 여기에 로그인 처리 로직 구현
-    console.log('로그인 시도:', { email, password });
-    // 지금은 간단한 유효성 검사만 수행
+  onMount(() => {
+    // URL에서 redirectTo 쿼리 파라미터 가져오기
+    const unsubscribeParams = page.subscribe(({ url }) => {
+      redirectTo = url.searchParams.get('redirectTo') || '/';
+    });
+
+    // 이미 로그인되어 있으면 메인 페이지 또는 리디렉션 URL로 이동
+    const unsubscribeAuth = authStore.subscribe(state => {
+      if (state.isAuthenticated) {
+        goto(redirectTo);
+      }
+    });
+    
+    return () => {
+      unsubscribeParams();
+      unsubscribeAuth();
+    };
+  });
+
+  async function handleSubmit() {
+    error = '';
+    
+    // 기본적인 유효성 검사
     if (!email || !password) {
       error = '이메일과 비밀번호를 모두 입력해주세요.';
       return;
     }
-    // 실제 로그인 로직은 추후 구현
+
+    // 로그인 API 호출
+    loading = true;
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        // 리디렉션 URL로 이동
+        goto(redirectTo);
+      } else {
+        error = result.message;
+      }
+    } catch (err) {
+      error = '로그인 중 오류가 발생했습니다. 나중에 다시 시도해주세요.';
+      console.error('로그인 오류:', err);
+    } finally {
+      loading = false;
+    }
   }
 </script>
 
@@ -36,6 +81,7 @@
           bind:value={email}
           placeholder="example@mail.com"
           required
+          disabled={loading}
         />
       </div>
       
@@ -47,10 +93,13 @@
           bind:value={password}
           placeholder="비밀번호를 입력하세요"
           required
+          disabled={loading}
         />
       </div>
       
-      <button type="submit" class="submit-button">로그인</button>
+      <button type="submit" class="submit-button" disabled={loading}>
+        {loading ? '로그인 중...' : '로그인'}
+      </button>
       
       <div class="auth-links">
         <a href="/forgot-password">비밀번호를 잊으셨나요?</a>
@@ -59,7 +108,7 @@
       
       <div class="social-login">
         <p>또는</p>
-        <button type="button" class="google-button">
+        <button type="button" class="google-button" disabled={loading}>
           Google로 로그인
         </button>
       </div>
@@ -102,7 +151,7 @@
   
   .error-message {
     background-color: #fff5f5;
-    color: var(--error-color);
+    color: var(--error-color, #e53e3e);
     padding: 0.75rem;
     border-radius: 4px;
     margin-bottom: 1rem;
@@ -114,6 +163,20 @@
     padding: 0.75rem;
     margin-top: 0.5rem;
     font-size: 1rem;
+    background-color: var(--primary-color, #4299e1);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .submit-button:hover:not([disabled]) {
+    background-color: var(--primary-dark, #3182ce);
+  }
+  
+  .submit-button:disabled {
+    background-color: var(--medium-gray, #cbd5e0);
+    cursor: not-allowed;
   }
   
   .auth-links {
@@ -124,13 +187,13 @@
   }
   
   .auth-links a {
-    color: var(--dark-gray);
+    color: var(--dark-gray, #4a5568);
     font-size: 0.9rem;
     text-align: center;
   }
   
   .auth-links a:hover {
-    color: var(--primary-color);
+    color: var(--primary-color, #4299e1);
   }
   
   .social-login {
@@ -139,7 +202,7 @@
   }
   
   .social-login p {
-    color: var(--dark-gray);
+    color: var(--dark-gray, #4a5568);
     margin-bottom: 1rem;
     position: relative;
   }
@@ -150,7 +213,7 @@
     position: absolute;
     width: 40%;
     height: 1px;
-    background-color: var(--medium-gray);
+    background-color: var(--medium-gray, #cbd5e0);
     top: 50%;
   }
   
@@ -164,12 +227,20 @@
   
   .google-button {
     background-color: white;
-    color: var(--text-color);
-    border: 1px solid var(--medium-gray);
+    color: var(--text-color, #1a202c);
+    border: 1px solid var(--medium-gray, #cbd5e0);
     width: 100%;
+    padding: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
   }
   
-  .google-button:hover {
-    background-color: var(--light-gray);
+  .google-button:hover:not([disabled]) {
+    background-color: var(--light-gray, #f7fafc);
+  }
+  
+  .google-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 </style>

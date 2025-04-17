@@ -7,7 +7,12 @@
 import { building } from '$app/environment';
 import { connectToDatabase, disconnectFromDatabase } from '$lib/db/mongo';
 import { error, type Handle } from '@sveltejs/kit';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '$env/static/private';
 import dotenv from 'dotenv';
+
+// JWT 비밀키
+const jwtSecret = JWT_SECRET || 'your_jwt_secret_key_here_change_in_production';
 
 // 환경 변수 로드
 dotenv.config();
@@ -42,8 +47,35 @@ if (!building) {
  */
 export const handle: Handle = async ({ event, resolve }) => {
   try {
-    // 여기에 각 요청에 대한 추가 처리 로직 구현
-    // 예: 인증 상태 확인, 사용자 정보 로드 등
+    // 쿠키에서 인증 토큰 가져오기
+    const authToken = event.cookies.get('auth_token');
+    
+    if (authToken) {
+      try {
+        // JWT 검증
+        const decoded = jwt.verify(authToken, jwtSecret) as { userId: string };
+        
+        // 요청 객체에 사용자 ID 설정
+        event.locals.userId = decoded.userId;
+        console.log(`인증 성공: 사용자 ID ${decoded.userId} 설정됨`);
+      } catch (err) {
+        // 오류 유형에 따른 상세 로깅
+        if (err instanceof jwt.JsonWebTokenError) {
+          console.error('잘못된 토큰 형식:', err.message);
+        } else if (err instanceof jwt.TokenExpiredError) {
+          console.error('토큰 만료됨:', err.message);
+        } else if (err instanceof jwt.NotBeforeError) {
+          console.error('토큰이 아직 활성화되지 않음:', err.message);
+        } else {
+          console.error('기타 토큰 검증 오류:', err);
+        }
+        
+        // 토큰이 유효하지 않은 경우 쿠키 삭제
+        event.cookies.delete('auth_token', { path: '/' });
+      }
+    } else {
+      console.log('인증 토큰 없음: 비인증 요청');
+    }
     
     // 요청 처리 계속 진행
     return await resolve(event);
